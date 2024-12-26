@@ -24,7 +24,7 @@ dependencies {
     testImplementation("org.projectlombok:lombok:1.18.36")
     testAnnotationProcessor("org.projectlombok:lombok:1.18.36")
 
-    testImplementation("org.junit.jupiter:junit-jupiter-engine:5.11.3")
+    testImplementation("org.junit.jupiter:junit-jupiter-engine:5.11.4")
 
     testImplementation("org.slf4j:slf4j-jdk14:2.0.16")
 }
