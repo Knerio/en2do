@@ -6,10 +6,19 @@ import lombok.experimental.FieldDefaults;
 
 import java.util.logging.Level;
 
-@SuppressWarnings("unused")
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
 public class SettingsBuilder {
+
+    public SettingsBuilder() {
+        this.mongoLoggerLevel = null;
+        this.disallowUUIDKeys = false;
+        this.allowDiskUse = false;
+        this.appendMethodAsComment = false;
+        this.enableMethodProperties = true; // In my opinion this should default to true
+        this.collectionPrefix = null;
+        this.collectionSuffix = null;
+    }
 
     /**
      * Defines the logger level for the mongodb loggers
@@ -39,7 +48,7 @@ public class SettingsBuilder {
      * This setting enables the conversion and usage of getter/setter methods
      * of entities in bson. Most of the time you don't need to enable this.
      */
-    boolean enableMethodProperties;
+    boolean enableMethodProperties; // Defaults to true
 
     /**
      * Defines the prefix of every collection
