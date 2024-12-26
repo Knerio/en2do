@@ -1,9 +1,10 @@
 package eu.koboo.en2do.mongodb.methods.predefined.impl;
 
 import com.mongodb.client.result.DeleteResult;
-import eu.koboo.en2do.mongodb.RepositoryMeta;
+import eu.koboo.en2do.mongodb.RepositoryData;
 import eu.koboo.en2do.mongodb.methods.predefined.GlobalPredefinedMethod;
 import eu.koboo.en2do.repository.Repository;
+import org.bson.conversions.Bson;
 
 import java.lang.reflect.Method;
 
@@ -14,9 +15,10 @@ public class MethodDeleteAll extends GlobalPredefinedMethod {
     }
 
     @Override
-    public <E, ID, R extends Repository<E, ID>> Object handle(RepositoryMeta<E, ID, R> repositoryMeta,
-                                                              Method method, Object[] arguments) throws Exception {
-        DeleteResult deleteResult = repositoryMeta.getEntityCollection().deleteMany(repositoryMeta.createIdExistsFilter());
+    public <E, ID, R extends Repository<E, ID>> Object handle(RepositoryData<E, ID, R> repositoryData,
+                                                              Method method, Object[] arguments) {
+        Bson idExistsFilter = createIdExistsFilter();
+        DeleteResult deleteResult = repositoryData.getEntityCollection().deleteMany(idExistsFilter);
         return deleteResult.wasAcknowledged();
     }
 }

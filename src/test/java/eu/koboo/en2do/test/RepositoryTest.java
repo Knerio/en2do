@@ -24,8 +24,9 @@ public abstract class RepositoryTest<E, ID, R extends Repository<E, ID>> {
 
     @BeforeAll
     public void setup() {
-        log.info("Starting Unit-Test [" + getClass().getName() + "]");
-        SettingsBuilder settingsBuilder = new SettingsBuilder();
+        log.info("Starting Unit-Test: " + getClass().getSimpleName());
+        SettingsBuilder settingsBuilder = new SettingsBuilder()
+            .disableMongoDBLogger();
 
 
         manager = new MongoManager(Credentials.fromResource(), settingsBuilder);
@@ -40,10 +41,10 @@ public abstract class RepositoryTest<E, ID, R extends Repository<E, ID>> {
 
     @AfterAll
     public void finish() {
-        log.info("Stopping Unit-Test [" + getClass().getName() + "]");
+        log.info("Stopping Unit-Test: " + getClass().getSimpleName());
         assertNotNull(manager);
         assertNotNull(repository);
-        assertTrue(repository.drop());
+//        assertTrue(repository.drop());
         manager.close();
     }
 

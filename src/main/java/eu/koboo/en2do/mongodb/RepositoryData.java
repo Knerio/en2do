@@ -3,7 +3,6 @@ package eu.koboo.en2do.mongodb;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
-import com.mongodb.client.model.Filters;
 import eu.koboo.en2do.MongoManager;
 import eu.koboo.en2do.mongodb.exception.methods.MethodInvalidPageException;
 import eu.koboo.en2do.mongodb.exception.methods.MethodInvalidSortLimitException;
@@ -30,7 +29,7 @@ import java.util.*;
 
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Getter
-public class RepositoryMeta<E, ID, R extends Repository<E, ID>> {
+public class RepositoryData<E, ID, R extends Repository<E, ID>> {
 
     MongoManager mongoManager;
     String collectionName;
@@ -44,7 +43,7 @@ public class RepositoryMeta<E, ID, R extends Repository<E, ID>> {
     @Getter(AccessLevel.NONE)
     Map<String, IndexedMethod<E, ID, R>> dynamicMethodRegistry;
 
-    public RepositoryMeta(MongoManager mongoManager, Class<R> repositoryClass, Class<E> entityClass,
+    public RepositoryData(MongoManager mongoManager, Class<R> repositoryClass, Class<E> entityClass,
                           Set<Field> entityFieldSet,
                           Class<ID> entityUniqueIdClass, Field entityUniqueIdField,
                           MongoCollection<E> entityCollection, String collectionName) {
@@ -65,80 +64,19 @@ public class RepositoryMeta<E, ID, R extends Repository<E, ID>> {
 
     public void destroy() {
         dynamicMethodRegistry.clear();
+        entityFieldSet.clear();
     }
 
     public void registerDynamicMethod(String methodName, IndexedMethod<E, ID, R> dynamicMethod) {
         if (dynamicMethodRegistry.containsKey(methodName)) {
             // Removed regex condition, because the hashmap couldn't handle methods with the same name.
-            throw new RuntimeException("Already registered dynamicMethod with name \"" + methodName + "\".");
+            throw new RuntimeException("Already registered dynamic method with name \"" + methodName + "\".");
         }
         dynamicMethodRegistry.put(methodName, dynamicMethod);
     }
 
     public IndexedMethod<E, ID, R> lookupDynamicMethod(String methodName) {
         return dynamicMethodRegistry.get(methodName);
-    }
-
-    @SuppressWarnings("unchecked")
-    public E checkEntity(Method method, Object argument) {
-        E entity = (E) argument;
-        if (entity == null) {
-            throw new NullPointerException("Entity of type " + entityClass.getName() + " as parameter of method " +
-                method.getName() + " is null.");
-        }
-        return entity;
-    }
-
-    @SuppressWarnings("unchecked")
-    public ID checkUniqueId(Method method, Object argument) {
-        ID uniqueId = (ID) argument;
-        if (uniqueId == null) {
-            throw new NullPointerException("UniqueId of Entity of type " + entityClass.getName() + " as parameter of method " +
-                method.getName() + " is null.");
-        }
-        return uniqueId;
-    }
-
-    @SuppressWarnings("unchecked")
-    public Collection<E> checkEntityCollection(Method method, Object argument) {
-        Collection<E> entity = (Collection<E>) argument;
-        if (entity == null) {
-            throw new NullPointerException("List of Entities of type " + entityClass.getName() + " as parameter of method " +
-                method.getName() + " is null.");
-        }
-        return entity;
-    }
-
-    @SuppressWarnings("unchecked")
-    public List<E> checkEntityList(Method method, Object argument) {
-        List<E> entity = (List<E>) argument;
-        if (entity == null) {
-            throw new NullPointerException("List of Entities of type " + entityClass.getName() + " as parameter of method " +
-                method.getName() + " is null.");
-        }
-        return entity;
-    }
-
-    @SuppressWarnings("unchecked")
-    public Collection<ID> checkUniqueIdList(Method method, Object argument) {
-        Collection<ID> entity = (Collection<ID>) argument;
-        if (entity == null) {
-            throw new NullPointerException("ID-List of Entities of type " + entityClass.getName() + " as parameter of method " +
-                method.getName() + " is null.");
-        }
-        return entity;
-    }
-
-    public ID getUniqueId(E entity) throws IllegalAccessException {
-        return entityUniqueIdClass.cast(entityUniqueIdField.get(entity));
-    }
-
-    public Bson createIdFilter(ID uniqueId) {
-        return Filters.eq("_id", uniqueId);
-    }
-
-    public Bson createIdExistsFilter() {
-        return Filters.exists("_id");
     }
 
     public FindIterable<E> createIterable(Bson filter, String methodName) {
@@ -148,7 +86,7 @@ public class RepositoryMeta<E, ID, R extends Repository<E, ID>> {
         } else {
             findIterable = entityCollection.find();
         }
-        if (mongoManager.getBuilder().isAppendMethodAsComment()) {
+        if (mongoManager.getSettingsBuilder().isAppendMethodAsComment()) {
             findIterable.comment("en2do \"" + methodName + "\"");
         }
         return findIterable;
@@ -170,11 +108,8 @@ public class RepositoryMeta<E, ID, R extends Repository<E, ID>> {
             return findIterable;
         }
         Sort sortOptions = (Sort) lastParamObject;
-        if (!sortOptions.getFieldDirectionMap().isEmpty()) {
-            for (Map.Entry<String, Integer> byField : sortOptions.getFieldDirectionMap().entrySet()) {
-                findIterable = findIterable.sort(new BasicDBObject(byField.getKey(), byField.getValue()));
-            }
-        }
+        findIterable = sortDirection(findIterable, sortOptions.getFieldDirectionMap());
+
         int limit = sortOptions.getLimit();
         if (limit != -1) {
             if (limit < -1 || limit == 0) {
@@ -189,17 +124,18 @@ public class RepositoryMeta<E, ID, R extends Repository<E, ID>> {
             }
             findIterable = findIterable.skip(skip);
         }
-        findIterable.allowDiskUse(mongoManager.getBuilder().isAllowDiskUse());
+        findIterable = findIterable.allowDiskUse(mongoManager.getSettingsBuilder().isAllowDiskUse());
         return findIterable;
     }
 
     public FindIterable<E> applySortAnnotations(Method method, FindIterable<E> findIterable) throws Exception {
         SortBy[] sortAnnotations = method.getAnnotationsByType(SortBy.class);
         if (sortAnnotations != null) {
+            Map<String, Boolean> fieldSortMap = new LinkedHashMap<>();
             for (SortBy sortBy : sortAnnotations) {
-                int orderType = sortBy.ascending() ? 1 : -1;
-                findIterable = findIterable.sort(new BasicDBObject(sortBy.field(), orderType));
+                fieldSortMap.put(sortBy.field(), sortBy.ascending());
             }
+            findIterable = sortDirection(findIterable, fieldSortMap);
         }
         if (method.isAnnotationPresent(Limit.class)) {
             Limit limit = method.getAnnotation(Limit.class);
@@ -217,33 +153,59 @@ public class RepositoryMeta<E, ID, R extends Repository<E, ID>> {
             }
             findIterable = findIterable.skip(value);
         }
-        findIterable.allowDiskUse(mongoManager.getBuilder().isAllowDiskUse());
+        findIterable = findIterable.allowDiskUse(mongoManager.getSettingsBuilder().isAllowDiskUse());
         return findIterable;
-    }
-
-    public FindIterable<E> applyMethodDefinedCount(IndexedMethod<E, ID, R> indexedMethod,
-                                                   FindIterable<E> findIterable) throws Exception {
-        Long methodDefinedEntityCount = indexedMethod.getMethodDefinedEntityCount();
-        if (methodDefinedEntityCount == null) {
-            return findIterable;
-        }
-        return findIterable.limit(Math.toIntExact(methodDefinedEntityCount));
     }
 
     public FindIterable<E> applyPageObject(Method method,
                                            FindIterable<E> findIterable, Object[] args) throws Exception {
-        Pagination pagination = (Pagination) args[args.length - 1];
+        // Pagination should always be the last parameter of the method.
+        // But of whatever reason, we could do something in the validation wrong,
+        // so we catch the class casting exception anyway.
+        Object parameterObject = args[args.length - 1];
+        Pagination pagination;
+        try {
+            pagination = (Pagination) parameterObject;
+        } catch (ClassCastException e) {
+            throw new RuntimeException("Invalid Pagination object " + parameterObject.getClass() + ": ", e);
+        }
+
+        // We do not allow pages lower or equal to zero. The results
+        // would just be empty, so we throw an exception to not allow that.
         if (pagination.getPage() <= 0) {
             throw new MethodInvalidPageException(method, repositoryClass);
         }
-        if (!pagination.getPageDirectionMap().isEmpty()) {
-            for (Map.Entry<String, Integer> byField : pagination.getPageDirectionMap().entrySet()) {
-                findIterable = findIterable.sort(new BasicDBObject(byField.getKey(), byField.getValue()));
-            }
+
+        // Let's apply the sorting direction of the pagination object.
+        findIterable = sortDirection(findIterable, pagination.getPageDirectionMap());
+
+        int limit = pagination.getEntitiesPerPage();
+        int skip = (int) ((pagination.getPage() - 1) * limit);
+
+        findIterable = findIterable
+            .limit(limit)
+            .skip(skip)
+            .allowDiskUse(mongoManager.getSettingsBuilder().isAllowDiskUse());
+        return findIterable;
+    }
+
+    private FindIterable<E> sortDirection(FindIterable<E> findIterable, Map<String, Boolean> fieldSortMap) {
+        if (findIterable == null) {
+            return findIterable;
         }
-        int skip = (int) ((pagination.getPage() - 1) * pagination.getEntitiesPerPage());
-        findIterable = findIterable.limit(pagination.getEntitiesPerPage()).skip(skip);
-        findIterable.allowDiskUse(true);
+
+        if (fieldSortMap == null || fieldSortMap.isEmpty()) {
+            return findIterable;
+        }
+
+        for (String sortKey : fieldSortMap.keySet()) {
+            Boolean ascending = fieldSortMap.get(sortKey);
+            if (ascending == null) {
+                continue;
+            }
+            int direction = ascending ? 1 : -1;
+            findIterable = findIterable.sort(new BasicDBObject(sortKey, direction));
+        }
         return findIterable;
     }
 
@@ -269,38 +231,40 @@ public class RepositoryMeta<E, ID, R extends Repository<E, ID>> {
     }
 
     public Document createUpdateDocument(UpdateBatch updateBatch) {
-        Document document = new Document();
-        Document fieldSetDocument = new Document();
-        Document fieldRenameDocument = new Document();
-        Document fieldUnsetDocument = new Document();
+        Document rootDocument = new Document();
+        Document documentSetFields = new Document();
+        Document documentRenameFields = new Document();
+        Document documentUnsetFields = new Document();
         for (FieldUpdate fieldUpdate : updateBatch.getUpdateList()) {
-            String field = fieldUpdate.getFieldName();
+            String fieldBsonName = fieldUpdate.getFieldName();
             UpdateType updateType = fieldUpdate.getUpdateType();
+
             Object filterableValue = null;
             if (fieldUpdate.getValue() != null && (updateType == UpdateType.SET || updateType == UpdateType.RENAME)) {
                 filterableValue = getFilterableValue(fieldUpdate.getValue());
             }
+
             switch (updateType) {
                 case SET:
-                    fieldSetDocument.append(field, filterableValue);
+                    documentSetFields.append(fieldBsonName, filterableValue);
                     break;
                 case RENAME:
-                    fieldRenameDocument.append(field, filterableValue);
+                    documentRenameFields.append(fieldBsonName, filterableValue);
                     break;
                 case REMOVE:
-                    fieldUnsetDocument.append(field, 0);
+                    documentUnsetFields.append(fieldBsonName, 0);
                     break;
             }
         }
-        if (!fieldUnsetDocument.isEmpty()) {
-            document.append("$unset", fieldUnsetDocument);
+        if (!documentUnsetFields.isEmpty()) {
+            rootDocument.append(UpdateType.REMOVE.getDocumentType(), documentUnsetFields);
         }
-        if (!fieldSetDocument.isEmpty()) {
-            document.append("$set", fieldSetDocument);
+        if (!documentSetFields.isEmpty()) {
+            rootDocument.append(UpdateType.SET.getDocumentType(), documentSetFields);
         }
-        if (!fieldRenameDocument.isEmpty()) {
-            document.append("$rename", fieldRenameDocument);
+        if (!documentRenameFields.isEmpty()) {
+            rootDocument.append(UpdateType.RENAME.getDocumentType(), documentRenameFields);
         }
-        return document;
+        return rootDocument;
     }
 }
