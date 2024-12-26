@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "eu.koboo"
-version = "1.3.6" 
+version = project.property("project_version") as String
 
 repositories {
     mavenCentral()
