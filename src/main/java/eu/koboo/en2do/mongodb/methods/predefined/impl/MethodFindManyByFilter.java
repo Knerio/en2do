@@ -1,7 +1,7 @@
 package eu.koboo.en2do.mongodb.methods.predefined.impl;
 
 import com.mongodb.client.FindIterable;
-import eu.koboo.en2do.mongodb.RepositoryMeta;
+import eu.koboo.en2do.mongodb.RepositoryData;
 import eu.koboo.en2do.mongodb.methods.predefined.GlobalPredefinedMethod;
 import eu.koboo.en2do.repository.Repository;
 import org.bson.conversions.Bson;
@@ -16,7 +16,7 @@ public class MethodFindManyByFilter extends GlobalPredefinedMethod {
     }
 
     @Override
-    public <E, ID, R extends Repository<E, ID>> Object handle(RepositoryMeta<E, ID, R> repositoryMeta,
+    public <E, ID, R extends Repository<E, ID>> Object handle(RepositoryData<E, ID, R> repositoryMeta,
                                                               Method method, Object[] arguments) throws Exception {
         Bson filter = (Bson) arguments[0];
         FindIterable<E> findIterable = repositoryMeta.createIterable(filter, methodName);
