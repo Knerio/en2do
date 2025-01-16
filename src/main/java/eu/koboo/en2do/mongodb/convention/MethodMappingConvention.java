@@ -34,7 +34,7 @@ public class MethodMappingConvention implements Convention {
     public void apply(ClassModelBuilder<?> classModelBuilder) {
         // If the setting is enabled, we don't need to remove the method properties
         // from the class model builder.
-        if (mongoManager.getSettingsBuilder().isEnableMethodProperties()) {
+        if (!mongoManager.getSettingsBuilder().isEnableMethodProperties()) {
             return;
         }
         Class<?> entityClass = classModelBuilder.getType();
