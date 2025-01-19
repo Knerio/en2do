@@ -1,5 +1,7 @@
 package eu.koboo.en2do.mongodb.convention;
 
+import eu.koboo.en2do.MongoManager;
+import eu.koboo.en2do.mongodb.RepositoryData;
 import eu.koboo.en2do.repository.entity.Id;
 import eu.koboo.en2do.repository.entity.TransformField;
 import eu.koboo.en2do.repository.entity.Transient;
@@ -21,6 +23,25 @@ import java.lang.annotation.Annotation;
 @RequiredArgsConstructor
 public class AnnotationConvention implements Convention {
 
+    private final MongoManager manager;
+
+    /**
+     * This method is used to get the RepositoryMeta object by the given typeClass,
+     * and if non is found, it returns null.
+     *
+     * @param typeClass The type of RepositoryMeta (should be the entity class)
+     * @return The RepositoryMeta if found, otherwise "null"
+     */
+    private RepositoryData<?, ?, ?> findRepositoryMetaOf(Class<?> typeClass) {
+        for (RepositoryData<?, ?, ?> meta : this.manager.getRepositoryDataByClassMap().values()) {
+            if (!meta.getEntityClass().equals(typeClass)) {
+                continue;
+            }
+            return meta;
+        }
+        return null;
+    }
+
     /**
      * @param classModelBuilder the ClassModelBuilder to apply the convention to
      * @see Convention
@@ -39,7 +60,10 @@ public class AnnotationConvention implements Convention {
                     continue;
                 }
                 if (readAnnotation instanceof Id) {
-                    classModelBuilder.idPropertyName(propertyModelBuilder.getName());
+                    RepositoryData<?, ?, ?> repositoryMeta = findRepositoryMetaOf(classModelBuilder.getType());
+                    if (repositoryMeta != null) {
+                        classModelBuilder.idPropertyName(propertyModelBuilder.getName());
+                    }
                 }
             }
             for (Annotation writeAnnotation : propertyModelBuilder.getWriteAnnotations()) {
@@ -52,7 +76,10 @@ public class AnnotationConvention implements Convention {
                     propertyModelBuilder.writeName(transformField.value());
                 }
                 if (writeAnnotation instanceof Id) {
-                    classModelBuilder.idPropertyName(propertyModelBuilder.getName());
+                    RepositoryData<?, ?, ?> repositoryMeta = findRepositoryMetaOf(classModelBuilder.getType());
+                    if (repositoryMeta != null) {
+                        classModelBuilder.idPropertyName(propertyModelBuilder.getName());
+                    }
                 }
             }
         }

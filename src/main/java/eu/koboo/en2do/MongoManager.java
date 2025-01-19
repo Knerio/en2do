@@ -66,6 +66,7 @@ public class MongoManager {
     SettingsBuilder settingsBuilder;
     RepositoryParser parser;
 
+    @Getter
     Map<Class<?>, RepositoryData<?, ?, ?>> repositoryDataByClassMap;
 
     @Getter
@@ -136,7 +137,7 @@ public class MongoManager {
                 .register(internalPropertyCodecProvider)
                 .automatic(true)
                 .conventions(List.of(
-                    new AnnotationConvention(),
+                    new AnnotationConvention(this),
                     Conventions.ANNOTATION_CONVENTION,
                     Conventions.SET_PRIVATE_FIELDS_CONVENTION
 //                    Conventions.USE_GETTERS_FOR_SETTERS
