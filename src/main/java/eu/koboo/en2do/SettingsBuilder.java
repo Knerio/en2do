@@ -15,7 +15,6 @@ public class SettingsBuilder {
         this.disallowUUIDKeys = false;
         this.allowDiskUse = false;
         this.appendMethodAsComment = false;
-        this.enableMethodProperties = true; // In my opinion this should default to true
         this.collectionPrefix = null;
         this.collectionSuffix = null;
     }
@@ -43,12 +42,6 @@ public class SettingsBuilder {
      * mongodb json construct. Can be seen in the mongodb database logs.
      */
     boolean appendMethodAsComment;
-
-    /**
-     * This setting enables the conversion and usage of getter/setter methods
-     * of entities in bson. Most of the time you don't need to enable this.
-     */
-    boolean enableMethodProperties; // Defaults to true
 
     /**
      * Defines the prefix of every collection
@@ -90,15 +83,6 @@ public class SettingsBuilder {
         return this;
     }
 
-    /**
-     * See field documentation.
-     *
-     * @return This builder
-     */
-    public SettingsBuilder enableMethodProperties() {
-        this.enableMethodProperties = true;
-        return this;
-    }
 
     /**
      * See field documentation.
@@ -152,7 +136,6 @@ public class SettingsBuilder {
         this.disallowUUIDKeys = otherBuilder.isDisallowUUIDKeys();
         this.allowDiskUse = otherBuilder.isAllowDiskUse();
         this.appendMethodAsComment = otherBuilder.isAppendMethodAsComment();
-        this.enableMethodProperties = otherBuilder.isEnableMethodProperties();
         this.collectionPrefix = otherBuilder.getCollectionPrefix();
         this.collectionSuffix = otherBuilder.getCollectionSuffix();
     }
