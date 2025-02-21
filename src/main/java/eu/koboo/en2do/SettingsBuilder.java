@@ -100,6 +100,11 @@ public class SettingsBuilder {
         return this;
     }
 
+    public SettingsBuilder disableMethodProperties() {
+        this.enableMethodProperties = false;
+        return this;
+    }
+
     /**
      * See field documentation.
      *
